@@ -457,7 +457,7 @@ func getOutput() string {
 	for owner, club := range clubs {
 
 		total := 0
-		table := `<table class="col-lg-5 col-md-5 col-sm-12 striped bordered">` +
+		table := `<div><table class="table table-condensed table-striped table-bordered">` +
 			"<tr>" +
 			"<th>Player</th><th>Club</th><th>Pos</th>" +
 			"<th>GS</th><th>A</th><th>GA</th><th>YC</th><th>BON</th>" +
@@ -468,7 +468,7 @@ func getOutput() string {
 
 			var row_style string
 			if i >= 11 {
-				row_style = ` class="row-danger"`
+				row_style = ` class="table-danger"`
 			}
 			table += fmt.Sprintf(
 				"<tr %s> <td>%s</td> <td>%s</td> <td>%s</td>"+
@@ -483,9 +483,9 @@ func getOutput() string {
 				playerLiveStat.TotalPoints)
 			total += playerLiveStat.TotalPoints
 		}
-		table += "</table>"
-		out += "<b>" + owner + " [Total Points: " + strconv.Itoa(total) + "]</b>"
-		out += table + "</br>"
+		table += "</table></div>"
+		out += `<div class="col-lg-5 col-md-5 col-sm-12"><div><b>` + owner + " [Total Points: " + strconv.Itoa(total) + "]</b></div>"
+		out += table + "</br></div>"
 	}
 
 	html := `<!DOCTYPE html><html><head>
@@ -496,14 +496,10 @@ func getOutput() string {
 body {
 font-size: 8pt;
 }
-.bordered {
-border: 2px solid #dee2e6; /* Outline style */
+.table-condensed>thead>tr>th, .table-condensed>tbody>tr>th, .table-condensed>tfoot>tr>th, .table-condensed>thead>tr>td, .table-condensed>tbody>tr>td, .table-condensed>tfoot>tr>td{
+    padding: 1px;
+	
 }
-
-.striped tbody tr:nth-of-type(odd) {
-background-color: #f5f5f5; /* Alternate row coloring */
-}
-
 </style>
 `
 	html += "<title>Live Draft Stats</title></head><body>"
@@ -512,7 +508,7 @@ background-color: #f5f5f5; /* Alternate row coloring */
 	html += `<div class="col">` + out + "</div>"
 	html += "</body></html>"
 
-	fmt.Println(html)
+	//fmt.Println(html)
 	return html
 }
 
