@@ -462,13 +462,18 @@ func getOutput() string {
 			"<th>Player</th><th>Club</th><th>Pos</th>" +
 			"<th>GS</th><th>A</th><th>GA</th><th>YC</th><th>BON</th>" +
 			"<th>PTS</th></tr>"
-		for _, pl := range club.Squad {
+		for i, pl := range club.Squad {
 			player := players[uint16(pl.Element)]
 			playerLiveStat := live[uint16(pl.Element)].Stats
 
+			var row_style string
+			if i >= 11 {
+				row_style = ` class="row-danger"`
+			}
 			table += fmt.Sprintf(
-				"<tr> <td>%s</td> <td>%s</td> <td>%s</td>"+
+				"<tr %s> <td>%s</td> <td>%s</td> <td>%s</td>"+
 					" <td>%d</td> <td>%d</td> <td>%d</td> <td>%d</td><td>%d</td><td>%d</td></tr>",
+				row_style,
 				player.WebName, TEAMS[player.Team-1], POS[player.ElementType-1],
 				playerLiveStat.GoalsScored,
 				playerLiveStat.Assists,
@@ -517,5 +522,5 @@ func handler(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 	http.HandleFunc("/", handler)
-	log.Fatal(http.ListenAndServe("0.0.0.0:8080", nil))
+	log.Fatal(http.ListenAndServe("0.0.0.0:80", nil))
 }
