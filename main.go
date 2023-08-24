@@ -454,10 +454,16 @@ func getOutput() string {
 
 	var out string
 	live := getLiveRequest(event).El
-	for owner, club := range clubs {
+
+	i := 0
+	for _, club := range clubs {
 
 		total := 0
-		table := `<div><table class="table table-condensed table-striped table-bordered">` +
+		var table string
+		if i%2 == 0 {
+			table += `<div class="row">`
+		}
+		table += `<div class="col-lg-5 col-md-5 col-sm-12"><div class="row"><div><table class="table table-condensed table-striped table-bordered">` +
 			"<tr>" +
 			"<th>Player</th><th>Club</th><th>Pos</th>" +
 			"<th>GS</th><th>A</th><th>GA</th><th>YC</th><th>BON</th>" +
@@ -483,15 +489,25 @@ func getOutput() string {
 				playerLiveStat.TotalPoints)
 			total += playerLiveStat.TotalPoints
 		}
-		table += "</table></div>"
-		out += `<div class="col-lg-5 col-md-5 col-sm-12"><div><b>` + owner + " [Total Points: " + strconv.Itoa(total) + "]</b></div>"
-		out += table + "</br></div>"
+		table += "</table></div></div></div>"
+
+		if i%2 == 1 {
+			table += `</div>`
+		}
+		//out += `<div class="col-lg-5 col-md-5 col-sm-12"><div class="row"><div><b>` +
+		//	owner + " [Total Points: " + strconv.Itoa(total) + "]</b></div></div></div>"
+		//
+		out += table
+
+		i += 1
 	}
 
-	html := `<!DOCTYPE html><html><head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-EVSTQN3/azprG1Anm3QDgpJLIm9Nao0Yz1ztcQTwFspd3yD65VohhpuuCOmLASjC" crossorigin="anonymous">
+	html := `
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
 <style>
 body {
 font-size: 8pt;
@@ -505,7 +521,7 @@ font-size: 8pt;
 	html += "<title>Live Draft Stats</title></head><body>"
 	html += "<center><h1>GAMEWEEK " + strconv.Itoa(int(event)) + "<h1></center>"
 
-	html += `<div class="col">` + out + "</div>"
+	html += `<div class="container">` + out + "</div>"
 	html += "</body></html>"
 
 	//fmt.Println(html)
