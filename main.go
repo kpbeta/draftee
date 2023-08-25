@@ -496,8 +496,8 @@ func getOutput() string {
 	clubs := map[int]Club{}
 	owners := map[int]string{}
 	for _, user := range draft.LeagueEntries {
-		owners[user.EntryID] = user.PlayerFirstName
-		clubs[user.EntryID] = getDraftClubs(uint32(user.EntryID), event)
+		owners[user.ID] = user.PlayerFirstName
+		clubs[user.ID] = getDraftClubs(uint32(user.EntryID), event)
 	}
 
 	TEAMS := []string{"ARS", "AVL", "BOU", "BRE", "BHA", "BUR", "CHE", "CRY", "EVE", "FUL",
@@ -513,28 +513,28 @@ func getOutput() string {
 	live := getLiveRequest(event).El
 
 	done := 0
-	club_order := []int{}
+	clubOrder := []int{}
 	for _, entry := range draft.Matches {
 		if entry.Event == int(event) {
-			club_order = append(club_order, entry.LeagueEntry1, entry.LeagueEntry2)
+			clubOrder = append(clubOrder, entry.LeagueEntry1, entry.LeagueEntry2)
 			done += 1
 		}
 		if done == 3 {
 			break
 		}
 	}
-	fmt.Println(club_order)
 
 	first_team := true
 	first_team_disp, second_team_disp := "", ""
-	for id, club := range clubs {
+	for _, clid := range clubOrder {
+		club := clubs[clid]
 		total := 0
 		var table string
 
 		table += `<table class="table table-condensed table-striped table-bordered">` +
 			"<tr>" +
 			"<th>Player</th><th>Club</th><th>Pos</th>" +
-			"<th>GS</th><th>A</th><th>GA</th><th>YC</th><th>BON</th>" +
+			"<th>MP</th><th>GS</th><th>AS</th><th>GA</th><th>YC</th><th>BPS</th><th>BO</th>" +
 			"<th>PTS</th></tr>"
 
 		for i, pl := range club.Squad {
@@ -547,20 +547,22 @@ func getOutput() string {
 			}
 			table += fmt.Sprintf(
 				"<tr %s> <td>%s</td> <td>%s</td> <td>%s</td>"+
-					" <td>%d</td> <td>%d</td> <td>%d</td> <td>%d</td><td>%d</td><td>%d</td></tr>",
+					"<td>%d</td> <td>%d</td> <td>%d</td> <td>%d</td> <td>%d</td> <td>%d</td><td>%d</td><td>%d</td></tr>",
 				row_style,
 				player.WebName, TEAMS[player.Team-1], POS[player.ElementType-1],
+				playerLiveStat.Minutes,
 				playerLiveStat.GoalsScored,
 				playerLiveStat.Assists,
 				playerLiveStat.GoalsConceded,
 				playerLiveStat.YellowCards,
+				playerLiveStat.Bps,
 				playerLiveStat.Bonus,
 				playerLiveStat.TotalPoints)
 			total += playerLiveStat.TotalPoints
 		}
 		table += "</table>"
 
-		player_deets := `<div><b>` + owners[id] + " [Total Points: " + strconv.Itoa(total) + "]</b></div>"
+		player_deets := `<div><b>` + owners[clid] + " [Total Points: " + strconv.Itoa(total) + "]</b></div>"
 
 		if first_team {
 			first_team_disp = fmt.Sprintf(player_template, player_deets, table)
