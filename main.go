@@ -493,9 +493,11 @@ func getOutput() string {
 	event := getCurrentEvent()
 	draft := readDraft()
 
-	clubs := map[string]Club{}
+	clubs := map[int]Club{}
+	owners := map[int]string{}
 	for _, user := range draft.LeagueEntries {
-		clubs[user.PlayerFirstName] = getDraftClubs(uint32(user.EntryID), event)
+		owners[user.EntryID] = user.PlayerFirstName
+		clubs[user.EntryID] = getDraftClubs(uint32(user.EntryID), event)
 	}
 
 	TEAMS := []string{"ARS", "AVL", "BOU", "BRE", "BHA", "BUR", "CHE", "CRY", "EVE", "FUL",
@@ -510,10 +512,22 @@ func getOutput() string {
 	var out string
 	live := getLiveRequest(event).El
 
+	done := 0
+	club_order := []int{}
+	for _, entry := range draft.Matches {
+		if entry.Event == int(event) {
+			club_order = append(club_order, entry.LeagueEntry1, entry.LeagueEntry2)
+			done += 1
+		}
+		if done == 3 {
+			break
+		}
+	}
+	fmt.Println(club_order)
+
 	first_team := true
 	first_team_disp, second_team_disp := "", ""
-	for owner, club := range clubs {
-
+	for id, club := range clubs {
 		total := 0
 		var table string
 
@@ -546,7 +560,7 @@ func getOutput() string {
 		}
 		table += "</table>"
 
-		player_deets := `<div><b>` + owner + " [Total Points: " + strconv.Itoa(total) + "]</b></div>"
+		player_deets := `<div><b>` + owners[id] + " [Total Points: " + strconv.Itoa(total) + "]</b></div>"
 
 		if first_team {
 			first_team_disp = fmt.Sprintf(player_template, player_deets, table)
