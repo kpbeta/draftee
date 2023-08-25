@@ -11,6 +11,58 @@ import (
 	"time"
 )
 
+const site_template string = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+	<title>Live Draft Stats</title>
+	<style>
+		body {
+		font-size: 8pt;
+		}
+		.table-condensed>thead>tr>th, .table-condensed>tbody>tr>th, .table-condensed>tfoot>tr>th, .table-condensed>thead>tr>td, .table-condensed>tbody>tr>td, .table-condensed>tfoot>tr>td{
+			padding: 1px;
+			
+		}
+	</style>
+</head>
+
+<body>
+	<center><h1>GAMEWEEK %d <h1></center>
+	<div class="container">
+		<div class="row">
+			%s
+		</div>
+	</div>
+</body>
+</html>
+`
+const matchup_template string = `
+		<div class="col-lg-5">
+			%s
+        </div>
+        <div class="col-lg-2">
+            <div >
+                <center>VS</center>
+            </div>
+        </div>
+        <div class="col-lg-5">
+			%s
+        </div>
+</br>
+`
+const player_template string = `
+ 			<div >
+                %s
+            </div>
+            <div >
+                %s
+            </div>
+`
+
 type Stats struct {
 	Minutes                  int     `json:"minutes"`
 	GoalsScored              int     `json:"goals_scored"`
@@ -455,19 +507,19 @@ func getOutput() string {
 	var out string
 	live := getLiveRequest(event).El
 
-	i := 0
-	for _, club := range clubs {
+	first_team := true
+	first_team_disp, second_team_disp := "", ""
+	for owner, club := range clubs {
 
 		total := 0
 		var table string
-		if i%2 == 0 {
-			table += `<div class="row">`
-		}
-		table += `<div class="col-lg-5 col-md-5 col-sm-12"><div class="row"><div><table class="table table-condensed table-striped table-bordered">` +
+
+		table += `<table class="table table-condensed table-striped table-bordered">` +
 			"<tr>" +
 			"<th>Player</th><th>Club</th><th>Pos</th>" +
 			"<th>GS</th><th>A</th><th>GA</th><th>YC</th><th>BON</th>" +
 			"<th>PTS</th></tr>"
+
 		for i, pl := range club.Squad {
 			player := players[uint16(pl.Element)]
 			playerLiveStat := live[uint16(pl.Element)].Stats
@@ -489,42 +541,21 @@ func getOutput() string {
 				playerLiveStat.TotalPoints)
 			total += playerLiveStat.TotalPoints
 		}
-		table += "</table></div></div></div>"
+		table += "</table>"
 
-		if i%2 == 1 {
-			table += `</div>`
+		player_deets := `<div><b>` + owner + " [Total Points: " + strconv.Itoa(total) + "]</b></div>"
+
+		if first_team {
+			first_team_disp = fmt.Sprintf(player_template, player_deets, table)
+			first_team = false
+		} else {
+			second_team_disp = fmt.Sprintf(player_template, player_deets, table)
+			out += fmt.Sprintf(matchup_template, first_team_disp, second_team_disp)
+			first_team = true
 		}
-		//out += `<div class="col-lg-5 col-md-5 col-sm-12"><div class="row"><div><b>` +
-		//	owner + " [Total Points: " + strconv.Itoa(total) + "]</b></div></div></div>"
-		//
-		out += table
-
-		i += 1
 	}
 
-	html := `
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
-<style>
-body {
-font-size: 8pt;
-}
-.table-condensed>thead>tr>th, .table-condensed>tbody>tr>th, .table-condensed>tfoot>tr>th, .table-condensed>thead>tr>td, .table-condensed>tbody>tr>td, .table-condensed>tfoot>tr>td{
-    padding: 1px;
-	
-}
-</style>
-`
-	html += "<title>Live Draft Stats</title></head><body>"
-	html += "<center><h1>GAMEWEEK " + strconv.Itoa(int(event)) + "<h1></center>"
-
-	html += `<div class="container">` + out + "</div>"
-	html += "</body></html>"
-
-	//fmt.Println(html)
+	html := fmt.Sprintf(site_template, getCurrentEvent(), out)
 	return html
 }
 
