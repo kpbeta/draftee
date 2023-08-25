@@ -41,6 +41,7 @@ const site_template string = `
 </html>
 `
 const matchup_template string = `
+<div class="row bg-success text-white">
 		<div class="col-lg-5">
 			%s
         </div>
@@ -52,6 +53,8 @@ const matchup_template string = `
         <div class="col-lg-5">
 			%s
         </div>
+</div>
+<hr class="hr">
 </br>
 `
 const player_template string = `
