@@ -510,7 +510,7 @@ func getOutput() string {
 
 	TEAMS := []string{"AR", "AV", "BO", "BR", "BH", "BU", "CH", "CR", "EV", "FL",
 		"LV", "LT", "MC", "MU", "NW", "NF", "SU", "TO", "WH", "WO"}
-	POS := []string{"G", "D", "M", "F"}
+	POS := []string{"GK", "DF", "MD", "FD"}
 
 	players := map[uint16]Player{}
 	for _, pl := range readPlayers() {
@@ -541,9 +541,9 @@ func getOutput() string {
 
 		table += `<table class="table table-condensed table-striped table-bordered">` +
 			"<tr>" +
-			"<th>Player</th><th>tm</th><th>P</th>" +
+			"<em><th>PLAYER</th><th>TM</th><th>POS</th>" +
 			"<th>MP</th><th>GS</th><th>AS</th><th>GA</th><th>YC</th><th>BO</th>" +
-			"<th>PT</th></tr>"
+			"<th>PT</th></em></tr>"
 
 		for i, pl := range club.Squad {
 			player := players[uint16(pl.Element)]
@@ -551,7 +551,15 @@ func getOutput() string {
 
 			var row_style string
 			if i >= 11 {
-				row_style = ` class="table-danger"`
+				if playerLiveStat.TotalPoints > 5 {
+					row_style = ` class="table-danger" style="font-weight:bold"`
+				} else if playerLiveStat.TotalPoints > 1 {
+					row_style = `class="table-danger style="font-weight:italic"`
+				} else {
+					row_style = ` class="table-danger"`
+				}
+			} else if playerLiveStat.Minutes > 0 {
+				row_style = `class="table-dark text-light"`
 			}
 
 			table += fmt.Sprintf(
@@ -566,7 +574,10 @@ func getOutput() string {
 				playerLiveStat.YellowCards,
 				playerLiveStat.Bonus,
 				playerLiveStat.TotalPoints)
-			total += playerLiveStat.TotalPoints
+			if i < 11 {
+				total += playerLiveStat.TotalPoints
+			}
+
 		}
 		table += "</table>"
 
