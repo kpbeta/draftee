@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"sort"
 	"strconv"
 	"time"
 )
@@ -21,7 +22,7 @@ const site_template string = `
 	<title>Live Draft Stats</title>
 	<style>
 		body {
-		font-size: 8pt;
+		font-size: 9pt;
 		}
 		.table-condensed>thead>tr>th, .table-condensed>tbody>tr>th, .table-condensed>tfoot>tr>th, .table-condensed>thead>tr>td, .table-condensed>tbody>tr>td, .table-condensed>tfoot>tr>td{
 			padding: 1px;
@@ -34,7 +35,18 @@ const site_template string = `
 	<center><h1>GAMEWEEK %d <h1></center>
 	<div class="container">
 		<div class="row">
-			%s
+			<div class="col-lg-10">
+				<div class="row">
+					%s
+				</div>
+			</div>
+			<div class="col-lg-2">
+				<div class="bg-primary text-light"><b><center>STANDINGS (Last GW)</center></b></div>
+				%s
+				<hr class="hr"> 
+				<div class="bg-warning text-light"><b><center>FIXTURES (Next GW)</center></b></div>
+				%s
+			</div>
 		</div>
 	</div>
 </body>
@@ -42,15 +54,11 @@ const site_template string = `
 `
 const matchup_template string = `
 <div class="row bg-success text-white">
-		<div class="col-lg-5">
+		<div class="col-lg-6">
 			%s
         </div>
-        <div class="col-lg-2">
-            <div >
-                <center>VS</center>
-            </div>
-        </div>
-        <div class="col-lg-5">
+   
+        <div class="col-lg-6">
 			%s
         </div>
 </div>
@@ -58,10 +66,10 @@ const matchup_template string = `
 </br>
 `
 const player_template string = `
- 			<div >
+ 			<div>
                 %s
             </div>
-            <div >
+            <div>
                 %s
             </div>
 `
@@ -500,9 +508,9 @@ func getOutput() string {
 		clubs[user.ID] = getDraftClubs(uint32(user.EntryID), event)
 	}
 
-	TEAMS := []string{"ARS", "AVL", "BOU", "BRE", "BHA", "BUR", "CHE", "CRY", "EVE", "FUL",
-		"LIV", "LUT", "MCI", "MUN", "NEW", "NFO", "SHU", "TOT", "WHU", "WOL"}
-	POS := []string{"GK", "DF", "MD", "FD"}
+	TEAMS := []string{"AR", "AV", "BO", "BR", "BH", "BU", "CH", "CR", "EV", "FL",
+		"LV", "LT", "MC", "MU", "NW", "NF", "SU", "TO", "WH", "WO"}
+	POS := []string{"G", "D", "M", "F"}
 
 	players := map[uint16]Player{}
 	for _, pl := range readPlayers() {
@@ -533,9 +541,9 @@ func getOutput() string {
 
 		table += `<table class="table table-condensed table-striped table-bordered">` +
 			"<tr>" +
-			"<th>Player</th><th>Club</th><th>Pos</th>" +
-			"<th>MP</th><th>GS</th><th>AS</th><th>GA</th><th>YC</th><th>BPS</th><th>BO</th>" +
-			"<th>PTS</th></tr>"
+			"<th>Player</th><th>tm</th><th>P</th>" +
+			"<th>MP</th><th>GS</th><th>AS</th><th>GA</th><th>YC</th><th>BO</th>" +
+			"<th>PT</th></tr>"
 
 		for i, pl := range club.Squad {
 			player := players[uint16(pl.Element)]
@@ -545,9 +553,10 @@ func getOutput() string {
 			if i >= 11 {
 				row_style = ` class="table-danger"`
 			}
+
 			table += fmt.Sprintf(
 				"<tr %s> <td>%s</td> <td>%s</td> <td>%s</td>"+
-					"<td>%d</td> <td>%d</td> <td>%d</td> <td>%d</td> <td>%d</td> <td>%d</td><td>%d</td><td>%d</td></tr>",
+					"<td>%d</td> <td>%d</td> <td>%d</td> <td>%d</td> <td>%d</td> <td>%d</td><td>%d</td></tr>",
 				row_style,
 				player.WebName, TEAMS[player.Team-1], POS[player.ElementType-1],
 				playerLiveStat.Minutes,
@@ -555,7 +564,6 @@ func getOutput() string {
 				playerLiveStat.Assists,
 				playerLiveStat.GoalsConceded,
 				playerLiveStat.YellowCards,
-				playerLiveStat.Bps,
 				playerLiveStat.Bonus,
 				playerLiveStat.TotalPoints)
 			total += playerLiveStat.TotalPoints
@@ -574,7 +582,47 @@ func getOutput() string {
 		}
 	}
 
-	html := fmt.Sprintf(site_template, getCurrentEvent(), out)
+	standings := `<table class="table table-condensed table-striped table-bordered">
+			<tr> <th>#</th><th>Player</th><th>W-D-L</th><th>PTS</th></tr>`
+	st := draft.Standings
+	sort.Slice(st, func(i, j int) bool {
+		if st[i].Total == st[j].Total {
+			return st[i].PointsFor-st[i].PointsAgainst > st[j].PointsFor-st[j].PointsAgainst
+		}
+		return st[i].Total > st[j].Total
+	})
+
+	for i, pos := range draft.Standings {
+		standings += fmt.Sprintf("<tr><td>%d</td><td>%s</td><td>%d-%d-%d</td><td>%d</td></tr>",
+			i+1, owners[pos.LeagueEntry], pos.MatchesWon, pos.MatchesDrawn, pos.MatchesLost, pos.Total)
+	}
+	standings += `</table>`
+
+	clubOrder = []int{}
+	done = 0
+	if event < 38 {
+		for _, entry := range draft.Matches {
+			if entry.Event == int(event)+1 {
+				clubOrder = append(clubOrder, entry.LeagueEntry1, entry.LeagueEntry2)
+				done += 1
+			}
+			if done == 3 {
+				break
+			}
+		}
+	}
+
+	var fixtures string
+	if len(clubOrder) == 6 {
+		fixtures = fmt.Sprintf(
+			`<div class="bg-secondary text-light"> <center><div>%s VS %s</div><div>%s VS %s</div><div>%s VS %s</div></center></div><br><p><p>`,
+			owners[clubOrder[0]], owners[clubOrder[1]], owners[clubOrder[2]],
+			owners[clubOrder[3]], owners[clubOrder[4]], owners[clubOrder[5]])
+	} else {
+		fixtures = "Could Not Load"
+	}
+
+	html := fmt.Sprintf(site_template, getCurrentEvent(), out, standings, fixtures)
 	return html
 }
 
