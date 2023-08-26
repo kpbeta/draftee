@@ -508,8 +508,8 @@ func getOutput() string {
 		clubs[user.ID] = getDraftClubs(uint32(user.EntryID), event)
 	}
 
-	TEAMS := []string{"AR", "AV", "BO", "BR", "BH", "BU", "CH", "CR", "EV", "FL",
-		"LV", "LT", "MC", "MU", "NW", "NF", "SU", "TO", "WH", "WO"}
+	TEAMS := []string{"ARS", "AVL", "BOU", "BRE", "BHA", "BUR", "CHE", "CRY", "EVE", "FUL",
+		"LIV", "LUT", "MCI", "MUN", "NEW", "NFO", "SHU", "TOT", "WHU", "WOL"}
 	POS := []string{"GK", "DF", "MD", "FD"}
 
 	players := map[uint16]Player{}
