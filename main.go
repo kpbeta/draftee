@@ -325,6 +325,41 @@ type Bootstrap struct {
 	Players Players `json:"elements"`
 }
 
+func readDraftLive() Draft {
+	// TODO: This is insecure; use only in dev environments.
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+	client := &http.Client{Transport: tr}
+	defer client.CloseIdleConnections()
+
+	req, err := http.NewRequest("GET",
+		"https://draft.premierleague.com/api/league/29143/details",
+		nil)
+
+	if err != nil {
+		// handle err
+	}
+	req.Header.Set("Authority", "draft.premierleague.com")
+	req.Header.Set("Accept", "*/*")
+	req.Header.Set("Accept-Language", "en-US,en;q=0.9")
+
+	resp, err := client.Do(req)
+	defer resp.Body.Close()
+
+	if err != nil {
+		fmt.Println("Error: ask administrator")
+	}
+
+	var draft Draft
+	err = json.NewDecoder(resp.Body).Decode(&draft)
+
+	if err != nil {
+		fmt.Println("Error:", err)
+	}
+	return draft
+}
+
 func readDraft() Draft {
 	file, err := os.Open("data-draft-league.json")
 	if err != nil {
@@ -499,7 +534,8 @@ func readPlayers() Players {
 
 func getOutput() string {
 	event := getCurrentEvent()
-	draft := readDraft()
+	// draft := readDraft()
+	draft := readDraftLive()
 
 	clubs := map[int]Club{}
 	owners := map[int]string{}
