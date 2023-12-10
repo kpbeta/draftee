@@ -46,6 +46,9 @@ const site_template string = `
 				<hr class="hr"> 
 				<div class="bg-warning text-light"><b><center>FIXTURES (Next GW)</center></b></div>
 				%s
+				<hr class="hr"> 
+				<div class="bg-warning text-light"><b><center>Gameweek Stats (This GW)</center></b></div>
+				%s
 			</div>
 		</div>
 	</div>
@@ -324,6 +327,33 @@ type Player struct {
 type Bootstrap struct {
 	Players Players `json:"elements"`
 }
+type Stat struct {
+	S string  `json:"s"`
+	H []ElVal `json:"h"`
+	A []ElVal `json:"a"`
+}
+type ElVal struct {
+	Element int `json:"element"`
+	Value   int `json:"value"`
+}
+type Fixture struct {
+	ID                   int       `json:"id"`
+	Started              bool      `json:"started"`
+	Stats                []Stat    `json:"stats"`
+	Code                 int       `json:"code"`
+	Finished             bool      `json:"finished"`
+	FinishedProvisional  bool      `json:"finished_provisional"`
+	KickoffTime          time.Time `json:"kickoff_time"`
+	Minutes              int       `json:"minutes"`
+	ProvisionalStartTime bool      `json:"provisional_start_time"`
+	TeamAScore           int       `json:"team_a_score"`
+	TeamHScore           int       `json:"team_h_score"`
+	PulseID              int       `json:"pulse_id"`
+	Event                int       `json:"event"`
+	TeamA                int       `json:"team_a"`
+	TeamH                int       `json:"team_h"`
+}
+type Fixtures []Fixture
 
 func readDraftLive() Draft {
 	// TODO: This is insecure; use only in dev environments.
@@ -359,7 +389,6 @@ func readDraftLive() Draft {
 	}
 	return draft
 }
-
 func readDraft() Draft {
 	file, err := os.Open("data-draft-league.json")
 	if err != nil {
@@ -476,25 +505,7 @@ func getDraftClubs(player uint32, gw uint8) Club {
 	return club
 }
 
-//	func unnamed(live Live, clubs map[string]Club) {
-//		fmt.Println(live)
-//		fmt.Println(clubs)
-//
-//		for player, club := range clubs {
-//			fmt.Println(player, club)
-//			points := 0
-//			for _, player := range club.Squad {
-//				playerId := uint16(player.Element)
-//				stats := live.El[playerId].Stats
-//				fmt.Println(stats)
-//				if stats.Minutes > 0 {
-//
-//					points += stats.TotalPoints
-//				}
-//			}
-//		}
-//	}
-func getPlayers() {
+func getPlayers() Players {
 	req, err := http.NewRequest("GET", "https://draft.premierleague.com/api/bootstrap-static", nil)
 	if err != nil {
 		// handle err
@@ -510,6 +521,14 @@ func getPlayers() {
 	}
 	defer resp.Body.Close()
 
+	// Create a new decoder
+	var bootstrap Bootstrap
+	err = json.NewDecoder(resp.Body).Decode(&bootstrap)
+	if err != nil {
+		fmt.Println("Error: Contact Admin")
+	}
+
+	return bootstrap.Players
 }
 func readPlayers() Players {
 	file, err := os.Open("data-bootstrap-static.json")
@@ -532,6 +551,147 @@ func readPlayers() Players {
 	return bootstrap.Players
 }
 
+func getFixtures(gw uint8) Fixtures {
+	req, err := http.NewRequest("GET",
+		"https://draft.premierleague.com/api/event/"+
+			strconv.Itoa(int(gw))+"/fixtures", nil)
+	if err != nil {
+		// handle err
+	}
+	req.Header.Set("Authority", "draft.premierleague.com")
+	req.Header.Set("Accept", "*/*")
+	req.Header.Set("Accept-Language", "en-US,en;q=0.9")
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		fmt.Println("Error: contact Admin")
+	}
+	defer resp.Body.Close()
+
+	// Create a new decoder
+	var fixtures Fixtures
+	err = json.NewDecoder(resp.Body).Decode(&fixtures)
+	if err != nil {
+		fmt.Println("Error: Contact Admin")
+	}
+
+	return fixtures
+}
+func getFromElVals(title string, elvals []ElVal, players map[uint16]Player) string {
+	val := ""
+	if len(elvals) > 0 {
+		val += "<b>" + title + "</b>:"
+		for i, elval := range elvals {
+			val += players[uint16(elval.Element)].WebName
+			if title == "BO" || title == "BPS" || title == "AS" || title == "GS" {
+				val += "(" + strconv.Itoa(elval.Value) + ") "
+			} else {
+				val += " "
+			}
+			if title == "BPS" && i >= 4 {
+				break
+			}
+		}
+	}
+	return val
+}
+func calculateBonus(elvals []ElVal) map[uint16]int {
+	// sort by bps
+	// get top 3
+	// if 2 have same bps, get top 4, if 3 have same bps, get top 5, if 4 have same bps, get top 6, and so on
+	sort.Slice(elvals, func(i, j int) bool {
+		return elvals[i].Value > elvals[j].Value
+	})
+
+	bonus := map[uint16]int{}
+	bonusPoints := 4
+	lastBps := 255
+	for _, val := range elvals {
+		if val.Value != lastBps {
+			bonusPoints -= 1
+			lastBps = val.Value
+		}
+		if bonusPoints == 0 || val.Value == 0 {
+			return bonus
+		}
+
+		bonus[uint16(val.Element)] = bonusPoints
+	}
+	return bonus
+}
+
+func getStats(stats []Stat, players map[uint16]Player) (string, map[uint16]int) {
+	home := ""
+	away := ""
+	bonus := map[uint16]int{}
+	for _, el := range stats {
+		switch stat := el.S; stat {
+		case "goals_scored":
+			home += getFromElVals("⚽", el.H, players)
+			away += getFromElVals("⚽", el.A, players)
+		case "assists":
+			home += getFromElVals("⤵️", el.H, players)
+			away += getFromElVals("⤵️", el.A, players)
+		case "yellow_cards":
+			home += getFromElVals("🟨", el.H, players)
+			away += getFromElVals("🟨", el.A, players)
+		case "red_cards":
+			home += getFromElVals("🟥", el.H, players)
+			away += getFromElVals("🟥", el.A, players)
+		case "own_goals":
+			home += getFromElVals("OG", el.H, players)
+			away += getFromElVals("OG", el.A, players)
+		case "penalties_saved":
+			home += getFromElVals("PS", el.H, players)
+			away += getFromElVals("PS", el.A, players)
+		case "penalties_missed":
+			home += getFromElVals("PM", el.H, players)
+			away += getFromElVals("PM", el.A, players)
+		case "bps":
+			bonus = calculateBonus(append(el.H, el.A...))
+			home += getFromElVals("BPS", el.H, players)
+			away += getFromElVals("BPS", el.A, players)
+		//case "bonus":
+		//	home += getFromElVals("BO", el.H, players)
+		//	away += getFromElVals("BO", el.A, players)
+		default:
+			continue
+		}
+	}
+	return "<b>HOME</b>  " + home + "<br/>" + "<b>AWAY</b>  " + away + "<hr />", bonus
+}
+
+func getFixtureResults(gw uint8, players map[uint16]Player, teams []string) (string, map[uint16]int) {
+	var s string
+	var stats string
+	bonus := map[uint16]int{}
+	gameBonus := map[uint16]int{}
+	for _, game := range getFixtures(gw) {
+		stats = ""
+		var state string
+		if game.Finished {
+			state = "FT"
+		} else if game.Started == false {
+			state = "NA"
+		} else {
+			state = strconv.Itoa(game.Minutes) + "'"
+		}
+
+		if game.Finished || game.Started {
+			stats, gameBonus = getStats(game.Stats, players)
+
+			for k, v := range gameBonus {
+				bonus[k] = v
+			}
+		}
+
+		s += fmt.Sprintf("%s:: %s [%d - %d] %s <br/>"+
+			"%s <br/>", state, teams[game.TeamA], game.TeamAScore, game.TeamHScore, teams[game.TeamH], stats)
+	}
+	return s, bonus
+}
+
 func getOutput() string {
 	event := getCurrentEvent()
 	// draft := readDraft()
@@ -544,17 +704,19 @@ func getOutput() string {
 		clubs[user.ID] = getDraftClubs(uint32(user.EntryID), event)
 	}
 
-	TEAMS := []string{"ARS", "AVL", "BOU", "BRE", "BHA", "BUR", "CHE", "CRY", "EVE", "FUL",
+	TEAMS := []string{"NA", "ARS", "AVL", "BOU", "BRE", "BHA", "BUR", "CHE", "CRY", "EVE", "FUL",
 		"LIV", "LUT", "MCI", "MUN", "NEW", "NFO", "SHU", "TOT", "WHU", "WOL"}
-	POS := []string{"GK", "DF", "MD", "FD"}
+	POS := []string{"NA", "GK", "DF", "MD", "FD"}
 
 	players := map[uint16]Player{}
-	for _, pl := range readPlayers() {
+	for _, pl := range getPlayers() {
 		players[uint16(pl.ID)] = pl
 	} // Fastness by serializing deserealizing this?
 
 	var out string
 	live := getLiveRequest(event).El
+
+	stats, bonus := getFixtureResults(event, players, TEAMS)
 
 	done := 0
 	clubOrder := []int{}
@@ -598,18 +760,27 @@ func getOutput() string {
 				row_style = `class="table-dark text-light"`
 			}
 
+			bonusPts := 0
+			if playerLiveStat.Bonus > 0 {
+				bonusPts = playerLiveStat.Bonus
+			} else {
+				if val, ok := bonus[uint16(pl.Element)]; ok {
+					bonusPts = val
+				}
+			}
+
 			table += fmt.Sprintf(
 				"<tr %s> <td>%s</td> <td>%s</td> <td>%s</td>"+
 					"<td>%d</td> <td>%d</td> <td>%d</td> <td>%d</td> <td>%d</td> <td>%d</td><td>%d</td></tr>",
 				row_style,
-				player.WebName, TEAMS[player.Team-1], POS[player.ElementType-1],
+				player.WebName, TEAMS[player.Team], POS[player.ElementType],
 				playerLiveStat.Minutes,
 				playerLiveStat.GoalsScored,
 				playerLiveStat.Assists,
 				playerLiveStat.GoalsConceded,
 				playerLiveStat.YellowCards,
-				playerLiveStat.Bonus,
-				playerLiveStat.TotalPoints)
+				bonusPts,
+				playerLiveStat.TotalPoints+bonusPts)
 			if i < 11 {
 				total += playerLiveStat.TotalPoints
 			}
@@ -669,7 +840,7 @@ func getOutput() string {
 		fixtures = "Could Not Load"
 	}
 
-	html := fmt.Sprintf(site_template, getCurrentEvent(), out, standings, fixtures)
+	html := fmt.Sprintf(site_template, getCurrentEvent(), out, standings, fixtures, stats)
 	return html
 }
 
