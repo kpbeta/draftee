@@ -782,7 +782,7 @@ func getOutput() string {
 				bonusPts,
 				playerLiveStat.TotalPoints+bonusPts)
 			if i < 11 {
-				total += playerLiveStat.TotalPoints
+				total += playerLiveStat.TotalPoints + bonusPts
 			}
 
 		}
